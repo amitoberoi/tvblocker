@@ -1,5 +1,6 @@
 package com.oberoi.tvblocker
 
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -12,6 +13,7 @@ object Api {
     data class SyncResult(
         val unlockSeconds: Long,   // seconds of unlock remaining, 0 = locked
         val disabled: Boolean,
+        val homePackage: String,
         val message: String?
     )
 
@@ -20,7 +22,13 @@ object Api {
      * unlock time is left. Time is returned as a *duration*, not a timestamp,
      * so the TV clock being wrong never matters.
      */
-    fun sync(base: String, deviceId: String, name: String, key: String): SyncResult? {
+    fun sync(
+        base: String,
+        deviceId: String,
+        name: String,
+        key: String,
+        launchersJson: String = "[]"
+    ): SyncResult? {
         if (base.isEmpty()) return null
         var conn: HttpURLConnection? = null
         try {
@@ -32,11 +40,16 @@ object Api {
             conn.doOutput = true
             conn.setRequestProperty("Content-Type", "application/json")
 
-            val body = JSONObject()
+            val payload = JSONObject()
                 .put("device_id", deviceId)
                 .put("name", name)
                 .put("key", key)
-                .toString()
+            try {
+                payload.put("launchers", JSONArray(launchersJson))
+            } catch (e: Exception) {
+                payload.put("launchers", JSONArray())
+            }
+            val body = payload.toString()
 
             val os: OutputStream = conn.outputStream
             os.write(body.toByteArray())
@@ -55,6 +68,7 @@ object Api {
             return SyncResult(
                 unlockSeconds = j.optLong("unlock_seconds", 0L),
                 disabled = j.optBoolean("disabled", false),
+                homePackage = j.optString("home_package", ""),
                 message = if (j.isNull("message")) null else j.optString("message", null)
             )
         } catch (e: Exception) {

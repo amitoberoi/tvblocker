@@ -51,6 +51,11 @@ object Prefs {
         get() = p().getBoolean("disabled", false)
         set(v) = p().edit().putBoolean("disabled", v).apply()
 
+    /** Launcher package chosen on the dashboard. */
+    var homePackage: String
+        get() = p().getString("home_package", "") ?: ""
+        set(v) = p().edit().putString("home_package", v).apply()
+
     fun setPin(pin: String) {
         p().edit().putString("pin_hash", sha256(pin)).apply()
     }

@@ -26,6 +26,17 @@ class BlockerAccessibilityService : AccessibilityService() {
     )
 
     private var lastBounce = 0L
+    private var launcherCache: Set<String> = emptySet()
+    private var launcherCacheAt = 0L
+
+    private fun launcherPackages(): Set<String> {
+        val now = System.currentTimeMillis()
+        if (now - launcherCacheAt > 60_000L || launcherCache.isEmpty()) {
+            launcherCache = Launchers.packages(this)
+            launcherCacheAt = now
+        }
+        return launcherCache
+    }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -38,11 +49,20 @@ class BlockerAccessibilityService : AccessibilityService() {
         if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
 
         Prefs.init(this)
-        if (State.disabled) return
 
         val pkg = event.packageName?.toString() ?: return
         if (pkg == packageName) return
         if (pkg in alwaysAllowed) return
+
+        // Launcher routing is enforced even while the blocker is switched off,
+        // so only the launcher picked on the dashboard can ever be reached.
+        val home = State.homePackage
+        if (home.isNotEmpty() && pkg != home && pkg in launcherPackages()) {
+            bounce()
+            return
+        }
+
+        if (State.disabled) return
 
         // Settings is guarded even during an unlock window, otherwise the app
         // could simply be switched off during allowed time.

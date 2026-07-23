@@ -56,6 +56,7 @@ class BlockerService : Service() {
         Prefs.init(this)
         State.unlockUntilWall = Prefs.unlockUntilWall
         State.disabled = Prefs.disabled
+        State.homePackage = Prefs.homePackage
 
         startForegroundSafe()
 
@@ -105,9 +106,17 @@ class BlockerService : Service() {
         override fun run() {
             try {
                 val r = Api.sync(
-                    Prefs.serverUrl, Prefs.deviceId, Prefs.deviceName, Prefs.enrollKey
+                    Prefs.serverUrl,
+                    Prefs.deviceId,
+                    Prefs.deviceName,
+                    Prefs.enrollKey,
+                    Launchers.json(this@BlockerService)
                 )
                 if (r != null) {
+                    if (r.homePackage != State.homePackage) {
+                        State.homePackage = r.homePackage
+                        Prefs.homePackage = r.homePackage
+                    }
                     if (r.disabled != State.disabled) {
                         State.disabled = r.disabled
                         Prefs.disabled = r.disabled

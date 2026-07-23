@@ -14,6 +14,9 @@ object State {
     /** Master off switch, set locally with the PIN. */
     @Volatile var disabled: Boolean = false
 
+    /** Which launcher the TV should use. Other launchers are blocked. */
+    @Volatile var homePackage: String = ""
+
     @Volatile var lastSyncOk: Long = 0L
     @Volatile var lastSyncError: String = ""
 

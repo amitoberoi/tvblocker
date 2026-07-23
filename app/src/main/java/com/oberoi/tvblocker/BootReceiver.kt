@@ -10,6 +10,7 @@ class BootReceiver : BroadcastReceiver() {
         Prefs.init(context)
         State.unlockUntilWall = Prefs.unlockUntilWall
         State.disabled = Prefs.disabled
+        State.homePackage = Prefs.homePackage
         BlockerService.start(context)
         if (!State.isUnlocked()) {
             LockActivity.bringUp(context)

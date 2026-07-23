@@ -2,8 +2,10 @@ package com.oberoi.tvblocker
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Bundle
 import android.os.Handler
@@ -54,6 +56,14 @@ class LockActivity : Activity() {
         Prefs.init(this)
         State.unlockUntilWall = Prefs.unlockUntilWall
         State.disabled = Prefs.disabled
+        if (State.homePackage.isEmpty()) State.homePackage = Prefs.homePackage
+
+        // Blocker switched off from the dashboard: behave like a normal TV by
+        // handing the screen straight to the stock launcher.
+        if (handOffIfDisabled()) {
+            BlockerService.start(this)
+            return
+        }
 
         buildUi()
         BlockerService.start(this)
@@ -110,8 +120,37 @@ class LockActivity : Activity() {
 
     private val refresh = object : Runnable {
         override fun run() {
+            if (handOffIfDisabled()) return
             render()
             ui.postDelayed(this, 1000L)
+        }
+    }
+
+    /** The launcher chosen on the dashboard, or the first one available. */
+    private fun stockLauncher(): ComponentName? = Launchers.chosen(this)
+
+    /**
+     * When the dashboard has switched the blocker off, step out of the way.
+     * Returns false if there is no other launcher, so the TV is never stranded.
+     */
+    private fun handOffIfDisabled(): Boolean {
+        if (!State.disabled) return false
+        val cn = stockLauncher() ?: return false
+        return try {
+            val i = Intent(Intent.ACTION_MAIN)
+            i.addCategory(Intent.CATEGORY_HOME)
+            i.component = cn
+            i.addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED or
+                    Intent.FLAG_ACTIVITY_NO_ANIMATION
+            )
+            startActivity(i)
+            overridePendingTransition(0, 0)
+            finish()
+            true
+        } catch (e: Exception) {
+            false
         }
     }
 
@@ -164,9 +203,11 @@ class LockActivity : Activity() {
             list = pm.queryIntentActivities(alt, 0)
         }
 
+        val launcherPkgs = Launchers.packages(this)
         for (ri in list) {
             val pkg = ri.activityInfo.packageName ?: continue
             if (pkg == packageName) continue
+            if (pkg in launcherPkgs) continue  // launchers are routed, not listed
             val b = Button(this)
             b.text = ri.loadLabel(pm)?.toString() ?: pkg
             b.textSize = 20f
@@ -266,7 +307,10 @@ class LockActivity : Activity() {
                     5 -> {
                         State.disabled = !State.disabled
                         Prefs.disabled = State.disabled
-                        render()
+                        if (!handOffIfDisabled()) {
+                            lastMode = -1
+                            render()
+                        }
                     }
                 }
             }

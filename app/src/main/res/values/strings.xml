@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">TV Blocker</string>
+    <string name="accessibility_label">TV Blocker guard</string>
+    <string name="admin_description">Prevents the TV Blocker app from being uninstalled without the parent PIN.</string>
+</resources>

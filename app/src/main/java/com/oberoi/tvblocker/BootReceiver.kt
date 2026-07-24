@@ -8,12 +8,9 @@ import android.content.Intent
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         Prefs.init(context)
-        State.unlockUntilWall = Prefs.unlockUntilWall
-        State.disabled = Prefs.disabled
-        State.homePackage = Prefs.homePackage
+        State.load()
+        // The TV boots into its own home screen; the service puts the locked
+        // banner up if it needs to.
         BlockerService.start(context)
-        if (!State.isUnlocked()) {
-            LockActivity.bringUp(context)
-        }
     }
 }

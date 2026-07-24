@@ -41,6 +41,7 @@ class BlockerAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         Prefs.init(this)
+        State.load()
         BlockerService.start(this)
     }
 
@@ -54,33 +55,45 @@ class BlockerAccessibilityService : AccessibilityService() {
         if (pkg == packageName) return
         if (pkg in alwaysAllowed) return
 
-        // Launcher routing is enforced even while the blocker is switched off,
-        // so only the launcher picked on the dashboard can ever be reached.
+        // The dashboard asked for the full-screen blocker: keep it on top.
+        if (State.showLock) {
+            LockActivity.bringUp(this, true)
+            return
+        }
+
+        // Home screens: only the one chosen on the dashboard may run.
         val home = State.homePackage
-        if (home.isNotEmpty() && pkg != home && pkg in launcherPackages()) {
-            bounce()
+        val launchers = launcherPackages()
+        if (pkg in launchers) {
+            if (home.isEmpty() || pkg == home) return
+            Launchers.goHome(this)
             return
         }
 
         if (State.disabled) return
 
-        // Settings is guarded even during an unlock window, otherwise the app
-        // could simply be switched off during allowed time.
+        // Settings stays guarded even during an unlock window, otherwise the
+        // app could simply be switched off during allowed time.
         if (pkg in settingsPackages && !State.settingsAllowed()) {
-            bounce()
+            refuse()
             return
         }
 
         if (!State.isUnlocked() && pkg !in settingsPackages) {
-            bounce()
+            refuse()
         }
     }
 
-    private fun bounce() {
+    /**
+     * Refuse an app while the TV is locked: say why, then return the TV to its
+     * own home screen. The blocker screen itself is never shown here.
+     */
+    private fun refuse() {
         val now = System.currentTimeMillis()
-        if (now - lastBounce < 400L) return
+        if (now - lastBounce < 800L) return
         lastBounce = now
-        LockActivity.bringUp(this)
+        OverlayManager.flash(this, State.blockedText)
+        Launchers.goHome(this)
     }
 
     override fun onInterrupt() { }

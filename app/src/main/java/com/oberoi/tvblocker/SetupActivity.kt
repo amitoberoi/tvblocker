@@ -96,13 +96,11 @@ class SetupActivity : Activity() {
             }
         })
 
-        col.addView(button("6. Make this app the home screen") {
-            Toast.makeText(
-                this,
-                "Press the HOME button on the remote, then choose TV Blocker and 'Always'.",
-                Toast.LENGTH_LONG
-            ).show()
-        })
+        col.addView(label(
+            "The TV keeps its own home screen. If TV Blocker was previously set " +
+                "as the launcher, open Settings \u2192 Apps \u2192 TV Blocker \u2192 " +
+                "Clear defaults, then press HOME and choose your normal home screen."
+        ))
 
         col.addView(button("Finish") {
             save()

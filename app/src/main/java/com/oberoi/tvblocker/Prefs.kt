@@ -56,6 +56,18 @@ object Prefs {
         get() = p().getString("home_package", "") ?: ""
         set(v) = p().edit().putString("home_package", v).apply()
 
+    var bannerText: String
+        get() = p().getString("banner_text", "") ?: ""
+        set(v) = p().edit().putString("banner_text", v).apply()
+
+    var blockedText: String
+        get() = p().getString("blocked_text", "") ?: ""
+        set(v) = p().edit().putString("blocked_text", v).apply()
+
+    var showLock: Boolean
+        get() = p().getBoolean("show_lock", false)
+        set(v) = p().edit().putBoolean("show_lock", v).apply()
+
     fun setPin(pin: String) {
         p().edit().putString("pin_hash", sha256(pin)).apply()
     }

@@ -48,15 +48,15 @@ class BlockerService : Service() {
     private var warned2 = false
     private var lastDeadline = 0L
     private var wasUnlocked = false
+    private var firstTick = true
+    private var forcedShown = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
         Prefs.init(this)
-        State.unlockUntilWall = Prefs.unlockUntilWall
-        State.disabled = Prefs.disabled
-        State.homePackage = Prefs.homePackage
+        State.load()
 
         startForegroundSafe()
 
@@ -105,17 +105,32 @@ class BlockerService : Service() {
     private val pollTask = object : Runnable {
         override fun run() {
             try {
+                val ack = State.ackShowLock
                 val r = Api.sync(
                     Prefs.serverUrl,
                     Prefs.deviceId,
                     Prefs.deviceName,
                     Prefs.enrollKey,
-                    Launchers.json(this@BlockerService)
+                    Launchers.json(this@BlockerService),
+                    ack
                 )
                 if (r != null) {
+                    if (ack) State.ackShowLock = false
                     if (r.homePackage != State.homePackage) {
                         State.homePackage = r.homePackage
                         Prefs.homePackage = r.homePackage
+                    }
+                    if (r.bannerText.isNotEmpty() && r.bannerText != State.bannerText) {
+                        State.bannerText = r.bannerText
+                        Prefs.bannerText = r.bannerText
+                    }
+                    if (r.blockedText.isNotEmpty() && r.blockedText != State.blockedText) {
+                        State.blockedText = r.blockedText
+                        Prefs.blockedText = r.blockedText
+                    }
+                    if (r.showLock != State.showLock) {
+                        State.showLock = r.showLock
+                        Prefs.showLock = r.showLock
                     }
                     if (r.disabled != State.disabled) {
                         State.disabled = r.disabled
@@ -153,21 +168,48 @@ class BlockerService : Service() {
             val unlocked = State.isUnlocked()
             val remaining = State.remainingMs()
 
+            val ctx = this@BlockerService
+
             if (unlocked && !State.disabled) {
                 if (!warned5 && remaining in 1..(5 * 60 * 1000L)) {
                     warned5 = true
-                    ReminderOverlay.show(this@BlockerService, "TV locks in 5 minutes")
+                    OverlayManager.flash(ctx, "TV locks in 5 minutes")
                 }
                 if (!warned2 && remaining in 1..(2 * 60 * 1000L)) {
                     warned2 = true
-                    ReminderOverlay.show(this@BlockerService, "TV locks in 2 minutes")
+                    OverlayManager.flash(ctx, "TV locks in 2 minutes")
                 }
             }
 
-            // The moment time expires, take the screen back.
-            if (wasUnlocked && !unlocked) {
-                LockActivity.bringUp(this@BlockerService)
+            // Full-screen blocker requested from the dashboard.
+            if (State.showLock && !forcedShown) {
+                forcedShown = true
+                LockActivity.bringUp(ctx, true)
             }
+            if (!State.showLock) forcedShown = false
+
+            // Persistent red banner for the whole time the TV is locked.
+            if (!unlocked && !State.showLock) {
+                OverlayManager.showBanner(ctx, State.bannerText)
+            } else {
+                OverlayManager.hideBanner(ctx)
+            }
+
+            if (!firstTick) {
+                if (!wasUnlocked && unlocked) {
+                    // Time granted: take the TV straight to its home screen.
+                    Launchers.goHome(ctx)
+                    if (!State.disabled) {
+                        val mins = (remaining + 59_000L) / 60_000L
+                        OverlayManager.flash(ctx, "TV unlocked for " + mins + " minutes")
+                    }
+                } else if (wasUnlocked && !unlocked) {
+                    // Time up: close whatever is playing and go home.
+                    Launchers.goHome(ctx)
+                }
+            }
+
+            firstTick = false
             wasUnlocked = unlocked
 
             ui.postDelayed(this, TICK_MS)
@@ -178,6 +220,7 @@ class BlockerService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        OverlayManager.hideBanner(this)
         try { netThread.quitSafely() } catch (e: Exception) { }
         // Ask to be restarted.
         WatchdogReceiver.schedule(this)

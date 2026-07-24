@@ -1,7 +1,7 @@
 package com.oberoi.tvblocker
 
 /**
- * Shared in-memory state. The service, the accessibility guard and the lock
+ * Shared in-memory state. The service, the accessibility guard and the parent
  * screen all live in the same process, so a plain object is enough.
  */
 object State {
@@ -11,11 +11,21 @@ object State {
     /** Parent entered the PIN, so system Settings may be opened until this time. */
     @Volatile var settingsAllowedUntil: Long = 0L
 
-    /** Master off switch, set locally with the PIN. */
+    /** Master off switch. */
     @Volatile var disabled: Boolean = false
 
     /** Which launcher the TV should use. Other launchers are blocked. */
     @Volatile var homePackage: String = ""
+
+    /** Wording shown on this TV, set per TV from the dashboard. */
+    @Volatile var bannerText: String = "TV is Locked"
+    @Volatile var blockedText: String = "TV is Locked. Please ask a parent to unlock it."
+
+    /** Dashboard asked for the full-screen blocker. */
+    @Volatile var showLock: Boolean = false
+
+    /** Parent cleared it; tell the server on the next poll. */
+    @Volatile var ackShowLock: Boolean = false
 
     @Volatile var lastSyncOk: Long = 0L
     @Volatile var lastSyncError: String = ""
@@ -29,4 +39,14 @@ object State {
 
     fun settingsAllowed(): Boolean =
         disabled || System.currentTimeMillis() < settingsAllowedUntil
+
+    /** Restore everything that survives a reboot. */
+    fun load() {
+        unlockUntilWall = Prefs.unlockUntilWall
+        disabled = Prefs.disabled
+        homePackage = Prefs.homePackage
+        showLock = Prefs.showLock
+        if (Prefs.bannerText.isNotEmpty()) bannerText = Prefs.bannerText
+        if (Prefs.blockedText.isNotEmpty()) blockedText = Prefs.blockedText
+    }
 }

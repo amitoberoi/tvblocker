@@ -2,37 +2,34 @@ package com.oberoi.tvblocker
 
 import android.app.Activity
 import android.app.AlertDialog
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.text.InputType
 import android.view.Gravity
 import android.view.KeyEvent
-import android.view.View
-import android.view.ViewGroup
-import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
-import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 
 /**
- * This activity is registered as HOME, so it is the screen the TV boots into
- * and the screen every HOME press returns to. When locked it shows a barrier.
- * When unlocked it turns into a small app launcher with a countdown.
+ * The parent screen. It is deliberately NOT the home screen: the TV shows its
+ * own launcher at all times, and this appears only in two situations —
+ *  1. a parent opens TV Blocker from the apps row, or
+ *  2. the dashboard asks for the full-screen blocker, which stays until the
+ *     parent PIN is entered.
  */
 class LockActivity : Activity() {
 
     companion object {
-        fun bringUp(ctx: Context) {
+        const val EXTRA_FORCED = "forced"
+
+        fun bringUp(ctx: Context, forced: Boolean = false) {
             try {
                 val i = Intent(ctx, LockActivity::class.java)
+                i.putExtra(EXTRA_FORCED, forced)
                 i.addFlags(
                     Intent.FLAG_ACTIVITY_NEW_TASK or
                         Intent.FLAG_ACTIVITY_CLEAR_TOP or
@@ -44,194 +41,76 @@ class LockActivity : Activity() {
         }
     }
 
-    private lateinit var root: LinearLayout
+    private var forced = false
+    private var pinShowing = false
     private lateinit var title: TextView
     private lateinit var subtitle: TextView
-    private lateinit var appHolder: LinearLayout
-    private val ui = Handler(Looper.getMainLooper())
-    private var lastMode = -1
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Prefs.init(this)
-        State.unlockUntilWall = Prefs.unlockUntilWall
-        State.disabled = Prefs.disabled
-        if (State.homePackage.isEmpty()) State.homePackage = Prefs.homePackage
+        State.load()
 
-        // Blocker switched off from the dashboard: behave like a normal TV by
-        // handing the screen straight to the stock launcher.
-        if (handOffIfDisabled()) {
-            BlockerService.start(this)
-            return
-        }
+        forced = intent?.getBooleanExtra(EXTRA_FORCED, false) == true || State.showLock
 
         buildUi()
         BlockerService.start(this)
 
         if (!Prefs.setupDone) {
             startActivity(Intent(this, SetupActivity::class.java))
+            return
         }
+
+        // Opened on purpose from the apps row: go straight to the PIN prompt.
+        if (!forced) askPin()
+    }
+
+    override fun onNewIntent(newIntent: Intent?) {
+        super.onNewIntent(newIntent)
+        intent = newIntent
+        forced = newIntent?.getBooleanExtra(EXTRA_FORCED, false) == true || State.showLock
+        render()
+        if (!forced && !pinShowing) askPin()
     }
 
     private fun buildUi() {
-        root = LinearLayout(this)
+        val root = LinearLayout(this)
         root.orientation = LinearLayout.VERTICAL
+        root.gravity = Gravity.CENTER
         root.setBackgroundColor(Color.parseColor("#0F1B2E"))
         root.setPadding(64, 48, 64, 48)
 
         title = TextView(this)
-        title.setTextColor(Color.WHITE)
-        title.textSize = 44f
-        title.gravity = Gravity.CENTER_HORIZONTAL
+        title.setTextColor(Color.parseColor("#FF6B6B"))
+        title.textSize = 46f
+        title.gravity = Gravity.CENTER
 
         subtitle = TextView(this)
         subtitle.setTextColor(Color.parseColor("#9DB2CC"))
         subtitle.textSize = 20f
-        subtitle.gravity = Gravity.CENTER_HORIZONTAL
-        subtitle.setPadding(0, 24, 0, 24)
-
-        appHolder = LinearLayout(this)
-        appHolder.orientation = LinearLayout.VERTICAL
-
-        val scroll = ScrollView(this)
-        scroll.addView(appHolder)
+        subtitle.gravity = Gravity.CENTER
+        subtitle.setPadding(0, 28, 0, 0)
 
         root.addView(title)
         root.addView(subtitle)
-        root.addView(
-            scroll,
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
-            )
-        )
         setContentView(root)
-    }
-
-    override fun onResume() {
-        super.onResume()
-        lastMode = -1
-        ui.post(refresh)
-    }
-
-    override fun onPause() {
-        super.onPause()
-        ui.removeCallbacks(refresh)
-    }
-
-    private val refresh = object : Runnable {
-        override fun run() {
-            if (handOffIfDisabled()) return
-            render()
-            ui.postDelayed(this, 1000L)
-        }
-    }
-
-    /** The launcher chosen on the dashboard, or the first one available. */
-    private fun stockLauncher(): ComponentName? = Launchers.chosen(this)
-
-    /**
-     * When the dashboard has switched the blocker off, step out of the way.
-     * Returns false if there is no other launcher, so the TV is never stranded.
-     */
-    private fun handOffIfDisabled(): Boolean {
-        if (!State.disabled) return false
-        val cn = stockLauncher() ?: return false
-        return try {
-            val i = Intent(Intent.ACTION_MAIN)
-            i.addCategory(Intent.CATEGORY_HOME)
-            i.component = cn
-            i.addFlags(
-                Intent.FLAG_ACTIVITY_NEW_TASK or
-                    Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED or
-                    Intent.FLAG_ACTIVITY_NO_ANIMATION
-            )
-            startActivity(i)
-            overridePendingTransition(0, 0)
-            finish()
-            true
-        } catch (e: Exception) {
-            false
-        }
+        render()
     }
 
     private fun render() {
-        val unlocked = State.isUnlocked()
-        val mode = if (unlocked) 1 else 0
-
-        if (unlocked) {
-            val secs = State.remainingMs() / 1000
-            val m = secs / 60
-            val s = secs % 60
-            title.text = "TV Unlocked"
-            subtitle.text = if (State.disabled)
-                "Blocker disabled. Hold OK to re-enable."
-            else
-                String.format("Time remaining  %02d:%02d   —   pick an app below", m, s)
+        if (forced) {
+            title.text = State.bannerText
+            subtitle.text = "Hold OK for 3 seconds and enter the parent PIN to continue."
         } else {
-            title.text = "TV Locked"
-            val extra = if (State.lastSyncError.isNotEmpty())
-                "\n(offline — hold OK for the parent PIN)" else ""
-            subtitle.text = "Ask a parent to allow time.$extra"
-        }
-
-        if (mode != lastMode) {
-            lastMode = mode
-            appHolder.removeAllViews()
-            if (unlocked) populateApps() else showLockedHint()
+            title.text = "TV Blocker"
+            subtitle.text = "Parent access. Hold OK for 3 seconds if the PIN box closes."
         }
     }
-
-    private fun showLockedHint() {
-        val t = TextView(this)
-        t.setTextColor(Color.parseColor("#5E7A8B"))
-        t.textSize = 18f
-        t.gravity = Gravity.CENTER_HORIZONTAL
-        t.text = "\nHold the OK button for 3 seconds to enter the parent PIN.\n\nDevice: " +
-            Prefs.deviceName + "  (" + Prefs.deviceId + ")"
-        appHolder.addView(t)
-    }
-
-    /** Because this app replaces HOME, it must offer a way to open apps. */
-    private fun populateApps() {
-        val pm = packageManager
-        val main = Intent(Intent.ACTION_MAIN)
-        main.addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER)
-        var list = pm.queryIntentActivities(main, 0)
-        if (list.isEmpty()) {
-            val alt = Intent(Intent.ACTION_MAIN)
-            alt.addCategory(Intent.CATEGORY_LAUNCHER)
-            list = pm.queryIntentActivities(alt, 0)
-        }
-
-        val launcherPkgs = Launchers.packages(this)
-        for (ri in list) {
-            val pkg = ri.activityInfo.packageName ?: continue
-            if (pkg == packageName) continue
-            if (pkg in launcherPkgs) continue  // launchers are routed, not listed
-            val b = Button(this)
-            b.text = ri.loadLabel(pm)?.toString() ?: pkg
-            b.textSize = 20f
-            b.isFocusable = true
-            b.setOnClickListener {
-                val launch = pm.getLeanbackLaunchIntentForPackage(pkg)
-                    ?: pm.getLaunchIntentForPackage(pkg)
-                if (launch != null) {
-                    launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    startActivity(launch)
-                } else {
-                    Toast.makeText(this, "Cannot open this app", Toast.LENGTH_SHORT).show()
-                }
-            }
-            appHolder.addView(b)
-        }
-    }
-
-    // ---- Parent escape hatch: works completely offline ----
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
             if (event.repeatCount == 0) event.startTracking()
-            if (!State.isUnlocked()) return true
+            return true
         }
         if (keyCode == KeyEvent.KEYCODE_MENU) {
             askPin()
@@ -249,30 +128,55 @@ class LockActivity : Activity() {
     }
 
     override fun onBackPressed() {
-        // Swallow Back so the barrier cannot be dismissed.
-        if (!State.isUnlocked()) return
-        // When unlocked, Back on the launcher should also do nothing.
+        // The forced screen may only be dismissed with the PIN.
+        if (forced) return
+        finish()
     }
 
     private fun askPin() {
+        if (pinShowing) return
         if (!Prefs.hasPin()) {
             startActivity(Intent(this, SetupActivity::class.java))
             return
         }
+        pinShowing = true
         val input = EditText(this)
         input.inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
-        AlertDialog.Builder(this)
+        val dialog = AlertDialog.Builder(this)
             .setTitle("Parent PIN")
             .setView(input)
+            .setCancelable(!forced)
             .setPositiveButton("OK") { _, _ ->
+                pinShowing = false
                 if (Prefs.checkPin(input.text.toString())) {
-                    parentMenu()
+                    onPinAccepted()
                 } else {
                     Toast.makeText(this, "Wrong PIN", Toast.LENGTH_SHORT).show()
+                    if (!forced) finish()
                 }
             }
-            .setNegativeButton("Cancel", null)
-            .show()
+            .setNegativeButton("Cancel") { _, _ ->
+                pinShowing = false
+                if (!forced) finish()
+            }
+            .create()
+        dialog.setOnCancelListener {
+            pinShowing = false
+            if (!forced) finish()
+        }
+        dialog.show()
+    }
+
+    private fun onPinAccepted() {
+        if (forced) {
+            // Clear the dashboard request and tell the server on the next poll.
+            forced = false
+            State.showLock = false
+            Prefs.showLock = false
+            State.ackShowLock = true
+            render()
+        }
+        parentMenu()
     }
 
     private fun parentMenu() {
@@ -282,9 +186,10 @@ class LockActivity : Activity() {
             "Lock now",
             "Open system Settings for 5 minutes",
             "Open setup / change server or PIN",
-            if (State.disabled) "Re-enable blocker" else "Disable blocker completely"
+            if (State.disabled) "Re-enable blocker" else "Disable blocker completely",
+            "Close"
         )
-        AlertDialog.Builder(this)
+        val dialog = AlertDialog.Builder(this)
             .setTitle("Parent menu")
             .setItems(items) { _, which ->
                 when (which) {
@@ -293,7 +198,8 @@ class LockActivity : Activity() {
                     2 -> {
                         State.unlockUntilWall = 0L
                         Prefs.unlockUntilWall = 0L
-                        render()
+                        Launchers.goHome(this)
+                        finish()
                     }
                     3 -> {
                         State.settingsAllowedUntil = System.currentTimeMillis() + 5 * 60_000L
@@ -302,26 +208,31 @@ class LockActivity : Activity() {
                         } catch (e: Exception) {
                             Toast.makeText(this, "Settings not available", Toast.LENGTH_SHORT).show()
                         }
+                        finish()
                     }
-                    4 -> startActivity(Intent(this, SetupActivity::class.java))
+                    4 -> {
+                        startActivity(Intent(this, SetupActivity::class.java))
+                        finish()
+                    }
                     5 -> {
                         State.disabled = !State.disabled
                         Prefs.disabled = State.disabled
-                        if (!handOffIfDisabled()) {
-                            lastMode = -1
-                            render()
-                        }
+                        Launchers.goHome(this)
+                        finish()
                     }
+                    else -> finish()
                 }
             }
-            .show()
+            .create()
+        dialog.setOnCancelListener { finish() }
+        dialog.show()
     }
 
     private fun grantLocal(minutes: Int) {
         val until = System.currentTimeMillis() + minutes * 60_000L
         State.unlockUntilWall = until
         Prefs.unlockUntilWall = until
-        lastMode = -1
-        render()
+        Launchers.goHome(this)
+        finish()
     }
 }

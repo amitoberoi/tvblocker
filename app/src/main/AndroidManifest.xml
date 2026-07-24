@@ -31,9 +31,8 @@
             android:excludeFromRecents="true"
             android:stateNotNeeded="true"
             android:configChanges="keyboard|keyboardHidden|orientation|screenSize">
-            <intent-filter android:priority="1000">
+            <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.HOME" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.LAUNCHER" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />

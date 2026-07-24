@@ -62,6 +62,22 @@ object Launchers {
         return if (all.isEmpty()) null else ComponentName(all[0].pkg, all[0].activity)
     }
 
+    /** Send the TV back to its own home screen. */
+    fun goHome(ctx: Context) {
+        val cn = chosen(ctx) ?: return
+        try {
+            val i = Intent(Intent.ACTION_MAIN)
+            i.addCategory(Intent.CATEGORY_HOME)
+            i.component = cn
+            i.addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED or
+                    Intent.FLAG_ACTIVITY_NO_ANIMATION
+            )
+            ctx.startActivity(i)
+        } catch (e: Exception) { }
+    }
+
     fun json(ctx: Context): String {
         val arr = JSONArray()
         for (e in list(ctx)) {

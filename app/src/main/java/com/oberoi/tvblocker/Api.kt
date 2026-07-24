@@ -14,6 +14,9 @@ object Api {
         val unlockSeconds: Long,   // seconds of unlock remaining, 0 = locked
         val disabled: Boolean,
         val homePackage: String,
+        val bannerText: String,
+        val blockedText: String,
+        val showLock: Boolean,
         val message: String?
     )
 
@@ -27,7 +30,8 @@ object Api {
         deviceId: String,
         name: String,
         key: String,
-        launchersJson: String = "[]"
+        launchersJson: String = "[]",
+        ackShowLock: Boolean = false
     ): SyncResult? {
         if (base.isEmpty()) return null
         var conn: HttpURLConnection? = null
@@ -49,6 +53,7 @@ object Api {
             } catch (e: Exception) {
                 payload.put("launchers", JSONArray())
             }
+            payload.put("ack_show_lock", ackShowLock)
             val body = payload.toString()
 
             val os: OutputStream = conn.outputStream
@@ -69,6 +74,11 @@ object Api {
                 unlockSeconds = j.optLong("unlock_seconds", 0L),
                 disabled = j.optBoolean("disabled", false),
                 homePackage = j.optString("home_package", ""),
+                bannerText = j.optString("banner_text", "TV is Locked"),
+                blockedText = j.optString(
+                    "blocked_text", "TV is Locked. Please ask a parent to unlock it."
+                ),
+                showLock = j.optBoolean("show_lock", false),
                 message = if (j.isNull("message")) null else j.optString("message", null)
             )
         } catch (e: Exception) {

@@ -55,6 +55,9 @@ class BlockerAccessibilityService : AccessibilityService() {
         if (pkg == packageName) return
         if (pkg in alwaysAllowed) return
 
+        // Released because the server is unreachable: block nothing at all.
+        if (State.failOpenActive) return
+
         // The dashboard asked for the full-screen blocker: keep it on top.
         if (State.showLock) {
             LockActivity.bringUp(this, true)

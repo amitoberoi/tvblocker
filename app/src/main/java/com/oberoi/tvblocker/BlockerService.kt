@@ -50,6 +50,8 @@ class BlockerService : Service() {
     private var wasUnlocked = false
     private var firstTick = true
     private var forcedShown = false
+    private var startedAt = 0L
+    private var wasFailOpen = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -58,6 +60,7 @@ class BlockerService : Service() {
         Prefs.init(this)
         State.load()
 
+        startedAt = System.currentTimeMillis()
         startForegroundSafe()
 
         netThread = HandlerThread("net").also { it.start() }
@@ -136,6 +139,10 @@ class BlockerService : Service() {
                         State.blockSettings = r.blockSettings
                         Prefs.blockSettings = r.blockSettings
                     }
+                    if (r.failOpenMinutes != State.failOpenMinutes) {
+                        State.failOpenMinutes = r.failOpenMinutes
+                        Prefs.failOpenMinutes = r.failOpenMinutes
+                    }
                     if (r.disabled != State.disabled) {
                         State.disabled = r.disabled
                         Prefs.disabled = r.disabled
@@ -173,6 +180,26 @@ class BlockerService : Service() {
             val remaining = State.remainingMs()
 
             val ctx = this@BlockerService
+
+            // Fail-open: if the server has been unreachable for longer than
+            // the family allows, release the TV rather than trap them.
+            val graceMs = State.failOpenMinutes * 60_000L
+            if (graceMs <= 0L) {
+                State.failOpenActive = false
+            } else {
+                val reference = if (State.lastSyncOk > 0L) State.lastSyncOk else startedAt
+                State.failOpenActive =
+                    (System.currentTimeMillis() - reference) > graceMs
+            }
+            if (State.failOpenActive != wasFailOpen) {
+                wasFailOpen = State.failOpenActive
+                if (State.failOpenActive) {
+                    Launchers.goHome(ctx)
+                    OverlayManager.flash(
+                        ctx, "Parental control unavailable - TV unlocked", 10000L
+                    )
+                }
+            }
 
             if (unlocked && !State.disabled) {
                 if (!warned5 && remaining in 1..(5 * 60 * 1000L)) {

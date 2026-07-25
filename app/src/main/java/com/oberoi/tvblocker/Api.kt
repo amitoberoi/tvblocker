@@ -18,6 +18,7 @@ object Api {
         val blockedText: String,
         val showLock: Boolean,
         val blockSettings: Boolean,
+        val failOpenMinutes: Int,
         val message: String?
     )
 
@@ -81,6 +82,7 @@ object Api {
                 ),
                 showLock = j.optBoolean("show_lock", false),
                 blockSettings = j.optBoolean("block_settings", true),
+                failOpenMinutes = j.optInt("fail_open_minutes", 30),
                 message = if (j.isNull("message")) null else j.optString("message", null)
             )
         } catch (e: Exception) {

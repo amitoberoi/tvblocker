@@ -27,13 +27,24 @@ object State {
     /** Block system Settings even during an allowed window. On by default. */
     @Volatile var blockSettings: Boolean = true
 
+    /**
+     * Minutes the TV may go without reaching the server before it frees
+     * itself. 0 means stay locked no matter what. This exists so a family is
+     * never trapped by a server problem they cannot fix.
+     */
+    @Volatile var failOpenMinutes: Int = 30
+
+    /** True while the TV has released itself because the server is silent. */
+    @Volatile var failOpenActive: Boolean = false
+
     /** Parent cleared it; tell the server on the next poll. */
     @Volatile var ackShowLock: Boolean = false
 
     @Volatile var lastSyncOk: Long = 0L
     @Volatile var lastSyncError: String = ""
 
-    fun isUnlocked(): Boolean = disabled || System.currentTimeMillis() < unlockUntilWall
+    fun isUnlocked(): Boolean =
+        disabled || failOpenActive || System.currentTimeMillis() < unlockUntilWall
 
     fun remainingMs(): Long {
         val r = unlockUntilWall - System.currentTimeMillis()
@@ -41,7 +52,8 @@ object State {
     }
 
     fun settingsAllowed(): Boolean =
-        disabled || System.currentTimeMillis() < settingsAllowedUntil
+        disabled || failOpenActive ||
+            System.currentTimeMillis() < settingsAllowedUntil
 
     /** Restore everything that survives a reboot. */
     fun load() {
@@ -50,6 +62,7 @@ object State {
         homePackage = Prefs.homePackage
         showLock = Prefs.showLock
         blockSettings = Prefs.blockSettings
+        failOpenMinutes = Prefs.failOpenMinutes
         if (Prefs.bannerText.isNotEmpty()) bannerText = Prefs.bannerText
         if (Prefs.blockedText.isNotEmpty()) blockedText = Prefs.blockedText
     }

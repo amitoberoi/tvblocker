@@ -121,16 +121,21 @@ class LockActivity : Activity() {
             else -> "\nError: " + State.lastSyncError
         }
         val lockState = when {
+            State.failOpenActive -> "FAIL-OPEN (server unreachable)"
             State.disabled -> "blocker OFF"
             State.isUnlocked() -> "UNLOCKED " + (State.remainingMs() / 60000) + " min left"
             else -> "LOCKED"
         }
-        return "App v2.0   Device: " + Prefs.deviceName +
+        return "App v3.0   Device: " + Prefs.deviceName +
             "\nServer: " + url +
             "\nLast sync: " + ago + err +
             "\nState: " + lockState +
             "\nHome: " + (if (State.homePackage.isEmpty()) "not set" else State.homePackage) +
             "\nBanner: " + State.bannerText +
+            "\nFail-open: " + (
+                if (State.failOpenMinutes <= 0) "strict, stays locked"
+                else State.failOpenMinutes.toString() + " min"
+            ) +
             "\n\nHold OK for 3 seconds if the PIN box closes."
     }
 

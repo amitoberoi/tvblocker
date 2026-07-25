@@ -72,14 +72,20 @@ class BlockerAccessibilityService : AccessibilityService() {
 
         if (State.disabled) return
 
-        // Settings stays guarded even during an unlock window, otherwise the
-        // app could simply be switched off during allowed time.
-        if (pkg in settingsPackages && !State.settingsAllowed()) {
-            refuse()
+        // Settings handling. The parent PIN grants a 5-minute window
+        // (settingsAllowed) that always lets Settings through.
+        if (pkg in settingsPackages) {
+            if (State.settingsAllowed()) return
+            // Otherwise Settings is refused whenever it is blocked for this TV,
+            // OR whenever the TV is locked. With block_settings on (the
+            // default) an allowed window does not open Settings.
+            if (State.blockSettings || !State.isUnlocked()) {
+                refuse()
+            }
             return
         }
 
-        if (!State.isUnlocked() && pkg !in settingsPackages) {
+        if (!State.isUnlocked()) {
             refuse()
         }
     }

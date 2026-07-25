@@ -68,6 +68,10 @@ object Prefs {
         get() = p().getBoolean("show_lock", false)
         set(v) = p().edit().putBoolean("show_lock", v).apply()
 
+    var blockSettings: Boolean
+        get() = p().getBoolean("block_settings", true)
+        set(v) = p().edit().putBoolean("block_settings", v).apply()
+
     fun setPin(pin: String) {
         p().edit().putString("pin_hash", sha256(pin)).apply()
     }

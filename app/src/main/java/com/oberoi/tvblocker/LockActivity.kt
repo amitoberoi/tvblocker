@@ -41,6 +41,7 @@ class LockActivity : Activity() {
         }
     }
 
+    private val ui = android.os.Handler(android.os.Looper.getMainLooper())
     private var forced = false
     private var pinShowing = false
     private lateinit var title: TextView
@@ -87,7 +88,7 @@ class LockActivity : Activity() {
 
         subtitle = TextView(this)
         subtitle.setTextColor(Color.parseColor("#9DB2CC"))
-        subtitle.textSize = 20f
+        subtitle.textSize = 16f
         subtitle.gravity = Gravity.CENTER
         subtitle.setPadding(0, 28, 0, 0)
 
@@ -103,8 +104,51 @@ class LockActivity : Activity() {
             subtitle.text = "Hold OK for 3 seconds and enter the parent PIN to continue."
         } else {
             title.text = "TV Blocker"
-            subtitle.text = "Parent access. Hold OK for 3 seconds if the PIN box closes."
+            subtitle.text = status()
         }
+    }
+
+    /** Shown on the parent screen so problems are visible without a laptop. */
+    private fun status(): String {
+        val url = if (Prefs.serverUrl.isEmpty()) "NOT SET" else Prefs.serverUrl
+        val last = State.lastSyncOk
+        val ago = if (last == 0L) "never"
+        else ((System.currentTimeMillis() - last) / 1000).toString() + "s ago"
+        val err = when {
+            State.lastSyncError.isEmpty() -> ""
+            State.lastSyncError.contains("403") ->
+                "\nError: 403 - enrollment key does not match the server"
+            else -> "\nError: " + State.lastSyncError
+        }
+        val lockState = when {
+            State.disabled -> "blocker OFF"
+            State.isUnlocked() -> "UNLOCKED " + (State.remainingMs() / 60000) + " min left"
+            else -> "LOCKED"
+        }
+        return "App v2.0   Device: " + Prefs.deviceName +
+            "\nServer: " + url +
+            "\nLast sync: " + ago + err +
+            "\nState: " + lockState +
+            "\nHome: " + (if (State.homePackage.isEmpty()) "not set" else State.homePackage) +
+            "\nBanner: " + State.bannerText +
+            "\n\nHold OK for 3 seconds if the PIN box closes."
+    }
+
+    private val tick = object : Runnable {
+        override fun run() {
+            render()
+            ui.postDelayed(this, 1000L)
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        ui.post(tick)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        ui.removeCallbacks(tick)
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {

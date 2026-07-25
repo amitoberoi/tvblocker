@@ -17,6 +17,7 @@ object Api {
         val bannerText: String,
         val blockedText: String,
         val showLock: Boolean,
+        val blockSettings: Boolean,
         val message: String?
     )
 
@@ -79,6 +80,7 @@ object Api {
                     "blocked_text", "TV is Locked. Please ask a parent to unlock it."
                 ),
                 showLock = j.optBoolean("show_lock", false),
+                blockSettings = j.optBoolean("block_settings", true),
                 message = if (j.isNull("message")) null else j.optString("message", null)
             )
         } catch (e: Exception) {

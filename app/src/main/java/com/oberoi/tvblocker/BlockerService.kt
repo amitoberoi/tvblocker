@@ -132,6 +132,10 @@ class BlockerService : Service() {
                         State.showLock = r.showLock
                         Prefs.showLock = r.showLock
                     }
+                    if (r.blockSettings != State.blockSettings) {
+                        State.blockSettings = r.blockSettings
+                        Prefs.blockSettings = r.blockSettings
+                    }
                     if (r.disabled != State.disabled) {
                         State.disabled = r.disabled
                         Prefs.disabled = r.disabled

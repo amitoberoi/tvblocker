@@ -24,6 +24,9 @@ object State {
     /** Dashboard asked for the full-screen blocker. */
     @Volatile var showLock: Boolean = false
 
+    /** Block system Settings even during an allowed window. On by default. */
+    @Volatile var blockSettings: Boolean = true
+
     /** Parent cleared it; tell the server on the next poll. */
     @Volatile var ackShowLock: Boolean = false
 
@@ -46,6 +49,7 @@ object State {
         disabled = Prefs.disabled
         homePackage = Prefs.homePackage
         showLock = Prefs.showLock
+        blockSettings = Prefs.blockSettings
         if (Prefs.bannerText.isNotEmpty()) bannerText = Prefs.bannerText
         if (Prefs.blockedText.isNotEmpty()) blockedText = Prefs.blockedText
     }

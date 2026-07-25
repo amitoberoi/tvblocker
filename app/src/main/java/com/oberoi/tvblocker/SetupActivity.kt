@@ -40,12 +40,18 @@ class SetupActivity : Activity() {
         col.addView(header("TV Blocker setup"))
         col.addView(label("This TV's ID: " + Prefs.deviceId))
 
-        col.addView(label("Dashboard URL (https://tv.yourdomain.com)"))
-        urlBox = field(InputType.TYPE_TEXT_VARIATION_URI, Prefs.serverUrl)
+        // VISIBLE_PASSWORD keeps the text readable while switching off
+        // auto-capitalisation and suggestions, which silently corrupted keys.
+        val rawInput = InputType.TYPE_CLASS_TEXT or
+            InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD or
+            InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+
+        col.addView(label("Dashboard URL (https://host:8443)"))
+        urlBox = field(rawInput, Prefs.serverUrl)
         col.addView(urlBox)
 
-        col.addView(label("Enrollment key (must match the server)"))
-        keyBox = field(InputType.TYPE_CLASS_TEXT, Prefs.enrollKey)
+        col.addView(label("Enrollment key (must match the server, case sensitive)"))
+        keyBox = field(rawInput, Prefs.enrollKey)
         col.addView(keyBox)
 
         col.addView(label("Name for this TV"))

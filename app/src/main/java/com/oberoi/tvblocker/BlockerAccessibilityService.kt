@@ -29,6 +29,34 @@ class BlockerAccessibilityService : AccessibilityService() {
     private var launcherCache: Set<String> = emptySet()
     private var launcherCacheAt = 0L
 
+    private val labelCache = HashMap<String, String>()
+
+    /** Human readable app name, cached because this runs on every window change. */
+    private fun labelFor(pkg: String): String {
+        val cached = labelCache[pkg]
+        if (cached != null) return cached
+        val label = try {
+            val pm = packageManager
+            pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
+        } catch (e: Exception) {
+            pkg
+        }
+        labelCache[pkg] = label
+        return label
+    }
+
+    /**
+     * Remember what is on screen so the dashboard can show it. Only real apps
+     * are recorded; system furniture and this app itself are skipped.
+     */
+    private fun noteForeground(pkg: String) {
+        if (pkg == State.currentPkg) return
+        if (pkg in alwaysAllowed || pkg in settingsPackages) return
+        if (pkg == packageName) return
+        State.currentPkg = pkg
+        State.currentLabel = labelFor(pkg)
+    }
+
     private fun launcherPackages(): Set<String> {
         val now = System.currentTimeMillis()
         if (now - launcherCacheAt > 60_000L || launcherCache.isEmpty()) {
@@ -54,6 +82,8 @@ class BlockerAccessibilityService : AccessibilityService() {
         val pkg = event.packageName?.toString() ?: return
         if (pkg == packageName) return
         if (pkg in alwaysAllowed) return
+
+        noteForeground(pkg)
 
         // Released because the server is unreachable: block nothing at all.
         if (State.failOpenActive) return

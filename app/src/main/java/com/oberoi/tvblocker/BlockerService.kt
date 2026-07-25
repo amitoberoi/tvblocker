@@ -115,7 +115,9 @@ class BlockerService : Service() {
                     Prefs.deviceName,
                     Prefs.enrollKey,
                     Launchers.json(this@BlockerService),
-                    ack
+                    ack,
+                    State.currentPkg,
+                    State.currentLabel
                 )
                 if (r != null) {
                     if (ack) State.ackShowLock = false

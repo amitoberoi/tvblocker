@@ -33,7 +33,9 @@ object Api {
         name: String,
         key: String,
         launchersJson: String = "[]",
-        ackShowLock: Boolean = false
+        ackShowLock: Boolean = false,
+        currentPkg: String = "",
+        currentLabel: String = ""
     ): SyncResult? {
         if (base.isEmpty()) return null
         var conn: HttpURLConnection? = null
@@ -56,6 +58,12 @@ object Api {
                 payload.put("launchers", JSONArray())
             }
             payload.put("ack_show_lock", ackShowLock)
+            if (currentPkg.isNotEmpty()) {
+                payload.put(
+                    "current_app",
+                    JSONObject().put("pkg", currentPkg).put("label", currentLabel)
+                )
+            }
             val body = payload.toString()
 
             val os: OutputStream = conn.outputStream

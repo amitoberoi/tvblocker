@@ -126,7 +126,7 @@ class LockActivity : Activity() {
             State.isUnlocked() -> "UNLOCKED " + (State.remainingMs() / 60000) + " min left"
             else -> "LOCKED"
         }
-        return "App v3.0   Device: " + Prefs.deviceName +
+        return "App v4.0   Device: " + Prefs.deviceName +
             "\nServer: " + url +
             "\nLast sync: " + ago + err +
             "\nState: " + lockState +

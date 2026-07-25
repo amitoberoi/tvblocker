@@ -37,6 +37,10 @@ object State {
     /** True while the TV has released itself because the server is silent. */
     @Volatile var failOpenActive: Boolean = false
 
+    /** The app currently in the foreground, reported to the dashboard. */
+    @Volatile var currentPkg: String = ""
+    @Volatile var currentLabel: String = ""
+
     /** Parent cleared it; tell the server on the next poll. */
     @Volatile var ackShowLock: Boolean = false
 

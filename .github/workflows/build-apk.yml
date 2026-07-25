@@ -19,6 +19,9 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Restore signing keystore
+        run: base64 -d release.keystore.b64 > release.keystore
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
